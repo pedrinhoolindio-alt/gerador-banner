@@ -126,6 +126,13 @@
       <button data-tpl="poster">Pôster</button>
     </div>
     <div class="hint" id="tplHint">Pôster: arte editorial de jogo, com tipografia gigante, dois atletas em destaque, cores dos clubes e informações da partida.</div>
+    <label>Fundo cinematográfico com IA (FLUX)</label>
+    <input type="text" id="aiWorkerUrl" value="https://gerador-banner-ai.pedrinhoolindio.workers.dev" aria-label="URL do Worker Cloudflare">
+    <div class="row" style="margin-top:8px">
+      <select id="aiScene" style="flex:1"><option value="stadium">Estádio noturno</option><option value="tunnel">Túnel dos jogadores</option><option value="arena">Arena esportiva</option><option value="abstract">Energia abstrata</option></select>
+      <button class="pri" id="aiGenerate">Gerar fundo IA</button>
+    </div>
+    <div class="hint" id="aiStatus">Gera apenas o cenário; atletas e textos continuam sendo montados pelo gerador.</div>
     <label>Título (modelos Arena e Claro)</label>
     <input type="text" id="title" value="JOGOS DE HOJE">
     <label>Cores</label>
@@ -171,7 +178,7 @@ const state = {
   source:'exemplo', games:[], selected:new Set(), filter:'',
   format:'story', template:'arena',
   brand:{ title:'JOGOS DE HOJE', ribbon:'HOJE TEM JOGO', primary:'#E8FF3A', accent:'#FF3B3B', handle:'@seuperfil', logo:null },
-  apiKey:'', date: todayISO()
+  apiKey:'', date: todayISO(), aiBackground:null, aiBusy:false
 };
 
 // ===================== UTIL =====================
@@ -852,6 +859,7 @@ function drawPoster(cv,g){
   const bg=c.createLinearGradient(0,0,W,H);
   bg.addColorStop(0,'#07152f'); bg.addColorStop(.48,'#101321'); bg.addColorStop(1,'#070a16');
   c.fillStyle=bg; c.fillRect(0,0,W,H);
+  if(state.aiBackground){ try{ coverBox(c,state.aiBackground,0,0,W,H); }catch(e){ console.warn('Fundo IA indisponível:',e); } }
   let glow=c.createRadialGradient(W*.22,H*.28,10,W*.22,H*.28,W*.72);
   glow.addColorStop(0,hexA(ch,.72)); glow.addColorStop(1,'rgba(0,0,0,0)');
   c.fillStyle=glow;c.fillRect(0,0,W,H);
@@ -984,9 +992,30 @@ document.getElementById('search').oninput=e=>{ state.filter=e.target.value; rend
 
 const bind=(id,key)=>{ const el=document.getElementById(id); el.oninput=()=>{ state.brand[key]=el.value; saveBrand(); scheduleRender(); }; };
 bind('title','title'); bind('ribbon','ribbon'); bind('cPri','primary'); bind('cAcc','accent'); bind('handle','handle');
-function saveBrand(){ const {logo,...rest}=state.brand; store('brand',rest); }
+function saveBrand(){ const {logo,aiBackground,...rest}=state.brand; store('brand',rest); }
 document.getElementById('logoInp').onchange=async e=>{ const f=e.target.files[0]; if(!f)return; state.brand.logo=await loadImg(URL.createObjectURL(f),false); scheduleRender(); };
 document.getElementById('logoClr').onclick=()=>{ state.brand.logo=null; scheduleRender(); };
+
+document.getElementById('aiGenerate').onclick=async()=>{
+  const url=document.getElementById('aiWorkerUrl').value.trim().replace(/\/$/,'');
+  const status=document.getElementById('aiStatus');
+  const btn=document.getElementById('aiGenerate');
+  if(!url){ status.textContent='Cole primeiro a URL do Worker Cloudflare.'; return; }
+  if(!/^https:\/\/[a-z0-9.-]+\.workers\.dev$/i.test(url)){ status.textContent='Use a URL HTTPS do subdomínio workers.dev.'; return; }
+  btn.disabled=true; btn.textContent='Gerando…'; status.textContent='Criando cenário cinematográfico com FLUX…';
+  try{
+    const response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({scene:document.getElementById('aiScene').value,sport:'football'})});
+    const data=await response.json();
+    if(!response.ok) throw new Error(data.error||'Falha na geração.');
+    const img=await loadImgRaw(data.image,false);
+    if(!img) throw new Error('A imagem retornada não pôde ser carregada.');
+    state.aiBackground=img;
+    status.textContent='Fundo gerado! Selecione o modelo Pôster para visualizar a composição.';
+    scheduleRender();
+  }catch(e){ status.textContent='Não foi possível gerar: '+e.message; }
+  finally{ btn.disabled=false; btn.textContent='Gerar fundo IA'; }
+};
+
 document.getElementById('dlAll').onclick=()=>{
   document.querySelectorAll('#pages canvas').forEach((cv,i)=>setTimeout(()=>download(cv,i),i*400));
 };
