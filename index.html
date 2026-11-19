@@ -378,6 +378,16 @@ function renderHighlights(){
       fi.onchange=async()=>{ const f=fi.files[0]; if(!f) return; team.player.img=await loadImg(URL.createObjectURL(f),false); team.player.source='upload'; team.player.blocked=false; drawThumb(cv,team.player.img); tn.textContent=team.name; scheduleRender(); };
       up.appendChild(fi); ctrl.appendChild(up);
       const bk=document.createElement('button'); bk.textContent='Buscar foto';
+      const applyPick=async(r,btnEl)=>{
+        results.querySelectorAll('button').forEach(x=>x.style.outline='');
+        if(btnEl) btnEl.style.outline='2px solid var(--acc)';
+        tn.textContent=team.name+' · carregando foto…';
+        await setPlayerFromBank(team,r);
+        inp.value=team.player.name;
+        drawThumb(cv,team.player.img);
+        tn.textContent=team.name+(team.player.img?' · foto aplicada no banner ✓':' · essa foto não carregou, toque em outra ou use "Enviar foto"');
+        scheduleRender();
+      };
       const results=document.createElement('div'); results.style.cssText='display:flex;gap:6px;flex-wrap:wrap;margin-top:6px';
       bk.onclick=async()=>{
         const q=inp.value.trim();
@@ -392,9 +402,11 @@ function renderHighlights(){
             const im=document.createElement('img'); im.src=r.img; im.style.cssText='width:58px;height:58px;object-fit:contain;display:block';
             const cap=document.createElement('div'); cap.textContent=r.team||r.name; cap.style.cssText='font-size:9px;color:#8a93a3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
             b.append(im,cap);
-            b.onclick=async()=>{ await setPlayerFromBank(team,r); renderHighlights(); scheduleRender(); };
+            b.onclick=()=>applyPick(r,b);
             results.appendChild(b);
           });
+          // já coloca automaticamente a melhor foto no banner
+          if(res.length) await applyPick(res[0], results.querySelector('button'));
         }catch(e){ results.innerHTML='<span class="hint" style="margin:0">Erro no banco de imagens: '+e.message+'</span>'; }
         bk.disabled=false; bk.textContent='Buscar foto';
       };
