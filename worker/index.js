@@ -3,8 +3,8 @@ const ALLOWED_ORIGINS = new Set([
   "https://pedrinhoolindio-alt.github.io",
 ]);
 
-const MAX_PROMPT_LENGTH = 1400;
-const MAX_STEPS = 4;
+const MAX_PROMPT_LENGTH = 2048;
+const MAX_STEPS = 8;
 
 function corsHeaders(origin) {
   return {
@@ -108,17 +108,12 @@ export default {
       return json({ error: "Invalid JSON body." }, 400, origin);
     }
 
-    const scene = ["stadium", "tunnel", "arena", "abstract"].includes(body.scene)
-      ? body.scene : "stadium";
-    const sport = ["football", "basketball", "volleyball", "american-football"].includes(body.sport)
-      ? body.sport : "football";
-
-    // Prompt is composed server-side: the browser cannot request arbitrary model behavior.
-    const seed = Number.isInteger(body.seed) && body.seed >= 0 && body.seed <= 2147483647 ? body.seed : Math.floor(Math.random() * 2147483647);
-    const prompt = makePrompt(scene, sport, seed);
-    if (prompt.length > MAX_PROMPT_LENGTH) {
-      return json({ error: "Prompt too long." }, 400, origin);
+    const prompt = typeof body.prompt === "string" ? body.prompt.trim() : "";
+    if (!prompt || prompt.length > MAX_PROMPT_LENGTH) {
+      return json({ error: "Informe um prompt entre 1 e 2048 caracteres." }, 400, origin);
     }
+    const seed = Number.isInteger(body.seed) && body.seed >= 0 && body.seed <= 2147483647
+      ? body.seed : Math.floor(Math.random() * 2147483647);
 
     try {
       const result = await env.AI.run(MODEL, {
@@ -134,7 +129,6 @@ export default {
       return json({
         image: `data:image/jpeg;base64,${result.image}`,
         model: MODEL,
-        scene,
         seed,
         steps: MAX_STEPS,
       }, 200, origin);
