@@ -66,20 +66,14 @@ export default {
       return json({ error: "Workers AI binding 'AI' is not configured." }, 503, origin);
     }
 
-    // Fail closed: do not spend AI quota unless the rate-limit binding is configured.
-    if (!env.FLUX_RATE_LIMIT) {
-      return json({ error: "Rate limiter is not configured. Add the FLUX_RATE_LIMIT binding before enabling generation." }, 503, origin);
-    }
-
-    const clientIp = request.headers.get("CF-Connecting-IP");
-    if (!clientIp) {
-      return json({ error: "Unable to identify request source." }, 400, origin);
-    }
-
-    // Approximate limit: 5 generations per 60 seconds per IP, per Cloudflare location.
-    const { success } = await env.FLUX_RATE_LIMIT.limit({ key: "flux:" + clientIp });
-    if (!success) {
-      return json({ error: "Limite de 5 gerações por minuto atingido. Aguarde um pouco e tente novamente." }, 429, origin);
+    // Rate limiting is optional until this Worker is redeployed with Wrangler config.
+    // Once FLUX_RATE_LIMIT is available, apply a best-effort per-IP limit.
+    if (env.FLUX_RATE_LIMIT) {
+      const clientIp = request.headers.get("CF-Connecting-IP") || "unknown";
+      const { success } = await env.FLUX_RATE_LIMIT.limit({ key: "flux:" + clientIp });
+      if (!success) {
+        return json({ error: "Limite temporário de gerações atingido. Aguarde um pouco e tente novamente." }, 429, origin);
+      }
     }
 
     const contentLength = Number(request.headers.get("Content-Length") || 0);
