@@ -320,17 +320,31 @@ async function tryBank(team, names){
 }
 
 async function setPlayerFromApi(team, p){
-  // Prioriza a foto vinculada ao atleta na API-Football.
-  team.player.name = p.name || [p.firstname,p.lastname].filter(Boolean).join(' ');
+  // Primeiro tenta obter um recorte transparente e confirmado por nome + clube.
+  const full=[p.name, p.firstname&&p.lastname?`${p.firstname} ${p.lastname}`:null].filter(Boolean);
+  for(const candidate of full){
+    try{
+      const wanted=normalizeName(candidate);
+      const matches=await tsdbSearch(candidate);
+      const cutout=matches.find(r=>{
+        const found=normalizeName(r.name), club=normalizeName(r.team), target=normalizeName(team.name);
+        return r.cutout && found===wanted && club && target &&
+          (club===target || club.includes(target) || target.includes(club));
+      });
+      if(cutout){
+        await setPlayerFromBank(team,cutout);
+        team.player.source='cutout';
+        team.player.name=p.name || cutout.name;
+        if(team.player.img) return;
+      }
+    }catch(e){ console.warn('Recorte oficial indisponível; usando foto da API:',e); }
+  }
+  // Fallback: foto oficial da API, sem inventar nem trocar a identidade do atleta.
+  team.player.name = p.name || full[0] || '';
   team.player.source = 'api';
   team.player.photoUrl = p.photo || '';
   team.player.img = await loadImg(p.photo, true);
   team.player.blocked = !team.player.img;
-  // Só recorre ao banco auxiliar quando nome e clube coincidirem exatamente.
-  if(!team.player.img){
-    const full=[p.name, p.firstname&&p.lastname?`${p.firstname} ${p.lastname}`:null].filter(Boolean);
-    if(await tryBank(team, full)){ team.player.name=p.name || team.player.name; return; }
-  }
 }
 async function autoHighlight(game){
   if(!state.apiKey || !game.leagueId) return;
@@ -506,7 +520,7 @@ function renderHighlights(){
       const wrap=document.createElement('div'); wrap.className='side';
       const cv=document.createElement('canvas'); drawThumb(cv, team.player.img);
       const right=document.createElement('div');
-      const tn=document.createElement('div'); tn.className='team'; tn.textContent=team.name + (team.player.blocked?' · essa foto não carregou, escolha outra ou envie uma':'') + (team.player.source==='banco'?' · foto do banco de imagens':'');
+      const tn=document.createElement('div'); tn.className='team'; tn.textContent=team.name + (team.player.blocked?' · essa foto não carregou, escolha outra ou envie uma':'') + (team.player.source==='cutout'?' · recorte do atleta':team.player.source==='banco'?' · foto do banco de imagens':'');
       const inp=document.createElement('input'); inp.type='text'; inp.placeholder='Nome do destaque'; inp.value=team.player.name;
       inp.oninput=()=>{ team.player.name=inp.value; scheduleRender(); };
       const ctrl=document.createElement('div'); ctrl.className='ctrl';
@@ -757,6 +771,12 @@ function coverBox(c,img,x,y,w,h){
   const s=Math.max(w/iw,h/ih), dw=iw*s, dh=ih*s;
   c.drawImage(img, x+(w-dw)/2, y-Math.max(0,dh-h)*0.08, dw, dh);
 }
+function containBox(c,img,x,y,w,h,padding=0.04){
+  const iw=img.naturalWidth||img.width, ih=img.naturalHeight||img.height;
+  const s=Math.min((w*(1-padding*2))/iw,(h*(1-padding*2))/ih);
+  const dw=iw*s, dh=ih*s;
+  c.drawImage(img,x+(w-dw)/2,y+(h-dh)/2,dw,dh);
+}
 function playerPanel(c,img,poly,x0,x1,y0,y1,color){
   c.save();
   c.beginPath(); poly.forEach(([px,py],i)=>i?c.lineTo(px,py):c.moveTo(px,py)); c.closePath(); c.clip();
@@ -879,7 +899,9 @@ function drawPoster(cv,g){
     c.save(); c.globalAlpha=.82;
     const x=W*.23,y=Y(210),w=W*.77,h=Y(1110);
     c.beginPath();c.rect(x,y,w,h);c.clip();
-    coverBox(c,home.player.img,x,y,w,h);
+    // Recortes transparentes são compostos inteiros; retratos são contidos sem ampliar/cortar o rosto.
+    if(home.player.source==='cutout') containBox(c,home.player.img,x,y,w,h,0.015);
+    else containBox(c,home.player.img,x,y,w,h,0.07);
     c.restore();
     const shadeG=c.createLinearGradient(0,Y(650),0,Y(1350));
     shadeG.addColorStop(0,'rgba(5,8,18,0)');shadeG.addColorStop(1,'rgba(5,8,18,.94)');
@@ -891,7 +913,8 @@ function drawPoster(cv,g){
     const x=-W*.06,y=Y(650),w=W*.63,h=Y(900);
     c.shadowColor=hexA(ca,.8);c.shadowBlur=X(42);
     c.beginPath();c.roundRect(x,y,w,h,X(20));c.clip();
-    coverBox(c,away.player.img,x,y,w,h);
+    if(away.player.source==='cutout') containBox(c,away.player.img,x,y,w,h,0.015);
+    else containBox(c,away.player.img,x,y,w,h,0.07);
     c.restore();
     c.fillStyle=hexA(ca,.8);c.fillRect(0,Y(650),X(9),Y(900));
   }
@@ -1004,7 +1027,7 @@ document.getElementById('aiGenerate').onclick=async()=>{
   if(!/^https:\/\/[a-z0-9.-]+\.workers\.dev$/i.test(url)){ status.textContent='Use a URL HTTPS do subdomínio workers.dev.'; return; }
   btn.disabled=true; btn.textContent='Gerando…'; status.textContent='Criando cenário cinematográfico com FLUX…';
   try{
-    const response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({scene:document.getElementById('aiScene').value,sport:'football'})});
+    const response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({scene:document.getElementById('aiScene').value,sport:'football',seed:Math.floor(Math.random()*2147483647)})});
     const data=await response.json();
     if(!response.ok) throw new Error(data.error||'Falha na geração.');
     const img=await loadImgRaw(data.image,false);
