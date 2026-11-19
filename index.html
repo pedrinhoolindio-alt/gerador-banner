@@ -50,6 +50,13 @@
   .side .ctrl{display:flex;gap:6px;margin-top:4px;flex-wrap:wrap}
   .side .ctrl button,.side .ctrl label.btn{padding:5px 8px;font-size:12px;margin:0;color:var(--txt)}
   .side select{margin-top:4px;font-size:12px;padding:5px}
+  .roster-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px;margin-top:9px}
+  .roster-card{padding:6px!important;text-align:center;min-width:0;background:#0d1015!important}
+  .roster-card img{width:100%;height:94px;object-fit:contain;display:block;background:#171c24;border-radius:5px}
+  .roster-card .rname{font-size:10px;line-height:1.25;margin-top:5px;white-space:normal;overflow-wrap:anywhere}
+  .roster-card .rpos{font-size:9px;color:var(--mut);margin-top:3px}
+  .roster-card.selected{outline:2px solid var(--acc);border-color:var(--acc)}
+  .roster-title{font-size:11px;color:var(--mut);margin-top:10px}
   .pages{display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start}
   .page{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px}
   .page canvas{display:block;border-radius:4px;background:#000}
@@ -413,6 +420,39 @@ async function autoHighlight(game){
   renderHighlights(); scheduleRender();
 }
 
+// ===================== PRÉVIA DE FOTOS DO ELENCO =====================
+async function loadRosterPreviews(team, container){
+  if(!container) return;
+  if(!state.apiKey || !team.id){ container.textContent='Informe a chave da API-Football para consultar o elenco e as fotos.'; return; }
+  container.innerHTML='<span class="hint">Carregando jogadores e fotos do elenco…</span>';
+  try{
+    const sq=await squad(team.id);
+    const entry=(sq||[]).find(x=>x.team && String(x.team.id)===String(team.id)) || (sq||[])[0];
+    const players=(entry&&entry.players)||[];
+    const candidates=players.filter(p=>p.photo).sort((a,b)=>{
+      const rank=p=>p.position==='Attacker'?0:p.position==='Midfielder'?1:p.position==='Goalkeeper'?3:2;
+      return rank(a)-rank(b);
+    });
+    if(!candidates.length){ container.textContent='A API não retornou fotos para este elenco. Você pode enviar uma foto manualmente.'; return; }
+    container.innerHTML='<div class="roster-title">Escolha o jogador pela foto — toque em uma imagem para aplicar</div>';
+    const grid=document.createElement('div'); grid.className='roster-grid'; container.appendChild(grid);
+    for(const p of candidates){
+      const card=document.createElement('button'); card.type='button'; card.className='roster-card';
+      const img=document.createElement('img'); img.alt=p.name||'Jogador'; img.loading='lazy';
+      const loaded=await loadImg(p.photo,true);
+      if(loaded){ try{ const c=document.createElement('canvas'); c.width=loaded.naturalWidth||loaded.width; c.height=loaded.naturalHeight||loaded.height; c.getContext('2d').drawImage(loaded,0,0); img.src=c.toDataURL('image/png'); }catch(e){ img.src=p.photo; } }
+      else { img.alt='Foto indisponível'; img.style.display='none'; }
+      const name=document.createElement('div'); name.className='rname'; name.textContent=p.name||'Jogador';
+      const pos=document.createElement('div'); pos.className='rpos'; pos.textContent=[p.number?'#'+p.number:null,p.position].filter(Boolean).join(' · ');
+      card.append(img,name,pos); if(team.player.name===p.name) card.classList.add('selected');
+      card.onclick=async()=>{
+        grid.querySelectorAll('.roster-card').forEach(x=>x.classList.remove('selected')); card.classList.add('selected');
+        await setPlayerFromApi(team,p); renderHighlights(); scheduleRender();
+      };
+      grid.appendChild(card);
+    }
+  }catch(e){ container.textContent='Não foi possível carregar o elenco: '+e.message; }
+}
 // ===================== LISTA DE JOGOS =====================
 function renderGameList(){
   const box = document.getElementById('gameList');
@@ -425,7 +465,7 @@ function renderGameList(){
     if(g.comp!==last){ const l=document.createElement('div'); l.className='league'; l.textContent=g.comp; box.appendChild(l); last=g.comp; }
     const row=document.createElement('label'); row.className='game';
     const cb=document.createElement('input'); cb.type='checkbox'; cb.checked=state.selected.has(g.id);
-    cb.onchange=()=>{ cb.checked?state.selected.add(g.id):state.selected.delete(g.id); if(cb.checked) autoHighlight(g); renderHighlights(); scheduleRender(); updateCount(); };
+    cb.onchange=()=>{ cb.checked?state.selected.add(g.id):state.selected.delete(g.id); renderHighlights(); if(cb.checked) autoHighlight(g); scheduleRender(); updateCount(); };
     const t=document.createElement('span'); t.className='t'; t.textContent=g.time;
     const n=document.createElement('span'); n.textContent=`${g.home.name} x ${g.away.name}`;
     row.append(cb,t,n); box.appendChild(row);
@@ -523,8 +563,10 @@ function renderHighlights(){
         rm.onclick=()=>{ team.player.img=null; team.player.source='manual'; renderHighlights(); scheduleRender(); };
         ctrl.appendChild(rm);
       }
-      right.append(tn,inp,ctrl,results);
+      const roster=document.createElement('div');
+      right.append(tn,inp,ctrl,results,roster);
       wrap.append(cv,right); card.appendChild(wrap);
+      if(state.apiKey && team.id) loadRosterPreviews(team,roster);
     });
     box.appendChild(card);
   });
