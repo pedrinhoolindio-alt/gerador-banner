@@ -2,6 +2,13 @@ name: Deploy FLUX Worker
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "worker/**"
+      - "wrangler.jsonc"
+      - ".github/workflows/deploy-flux-worker.yml"
 
 jobs:
   deploy:
