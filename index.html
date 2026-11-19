@@ -465,7 +465,7 @@ function renderGameList(){
     if(g.comp!==last){ const l=document.createElement('div'); l.className='league'; l.textContent=g.comp; box.appendChild(l); last=g.comp; }
     const row=document.createElement('label'); row.className='game';
     const cb=document.createElement('input'); cb.type='checkbox'; cb.checked=state.selected.has(g.id);
-    cb.onchange=()=>{ cb.checked?state.selected.add(g.id):state.selected.delete(g.id); renderHighlights(); if(cb.checked) autoHighlight(g); scheduleRender(); updateCount(); };
+    cb.onchange=()=>{ cb.checked?state.selected.add(g.id):state.selected.delete(g.id); renderHighlights(); scheduleRender(); updateCount(); };
     const t=document.createElement('span'); t.className='t'; t.textContent=g.time;
     const n=document.createElement('span'); n.textContent=`${g.home.name} x ${g.away.name}`;
     row.append(cb,t,n); box.appendChild(row);
