@@ -351,10 +351,12 @@ async function generateAutomatically(){
     document.querySelector('#srcSeg [data-src="api"]').click();
     return;
   }
-  if(!state.games.length){
-    await loadFixtures();
-    if(!state.games.length) return;
+  // A geração automática sempre usa jogos reais da API, nunca os confrontos de demonstração.
+  if(state.source!=='api'){
+    document.querySelector('#srcSeg [data-src="api"]').click();
   }
+  await loadFixtures();
+  if(!state.games.length) return;
   const games=[...state.games];
   if(!games.length){ status.textContent='Nenhum jogo encontrado para esta data.'; return; }
   state.selected=new Set(games.map(g=>g.id));
