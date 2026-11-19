@@ -123,6 +123,7 @@ export default {
       const result = await env.AI.run(MODEL, {
         prompt,
         steps: MAX_STEPS,
+        seed,
       });
 
       if (!result || typeof result.image !== "string" || !result.image.length) {
@@ -133,6 +134,7 @@ export default {
         image: `data:image/jpeg;base64,${result.image}`,
         model: MODEL,
         scene,
+        seed,
         steps: MAX_STEPS,
       }, 200, origin);
     } catch (error) {
