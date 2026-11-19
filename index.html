@@ -291,7 +291,7 @@ async function tsdbSearch(name){
   const j=await r.json();
   const out=(j.player||[])
     .filter(p=>!p.strSport || p.strSport==='Soccer')
-    .map(p=>({name:p.strPlayer, team:p.strTeam||'', img:p.strCutout||p.strRender||p.strThumb, cutout:!!(p.strCutout||p.strRender)}))
+    .map(p=>({name:p.strPlayer, team:p.strTeam||'', img:p.strCutout||p.strRender||p.strThumb, cutout:!!p.strCutout}))
     .filter(p=>p.img)
     .sort((a,b)=>b.cutout-a.cutout);
   store('c_'+key,out); return out;
