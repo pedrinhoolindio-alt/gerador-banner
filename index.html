@@ -281,7 +281,7 @@ async function scorers(leagueId, season){
 async function squad(teamId){
   return api(`/players/squads?team=${teamId}`, `sq_${teamId}`);
 }
-// ===================== BANCO DE IMAGENS (TheSportsDB) =====================
+// ===================== PESQUISA DE IMAGENS NA WEB =====================
 // ===================== BUSCA ABERTA DE FOTOGRAFIAS (WIKIMEDIA COMMONS) =====================
 async function webImageSearch(name){
   const q=(name||'').trim(); if(q.length<3) return [];
@@ -336,7 +336,7 @@ async function setPlayerFromApi(team, p){
   const tokens=wanted.split(' ').filter(t=>t.length>2);
   const match=results.find(r=>{
     const title=normalizeName(r.name);
-    return tokens.length && tokens.filter(t=>title.includes(t)).length>=Math.min(2,tokens.length);
+    return tokens.length>=2 && tokens.every(t=>title.includes(t));
   });
   if(match) await setPlayerFromBank(team,match);
 }
@@ -530,7 +530,7 @@ function renderHighlights(){
         await setPlayerFromBank(team,r);
         inp.value=team.player.name;
         drawThumb(cv,team.player.img);
-        tn.textContent=team.name+(team.player.img?' · foto aplicada no banner ✓':' · essa foto não carregou, toque em outra ou use "Enviar foto"');
+        tn.textContent=team.name+(team.player.img?' · foto aplicada ✓ · '+(team.player.license||'licença não identificada')+' · '+(team.player.attribution||'autor não identificado'):' · essa foto não carregou, toque em outra ou use "Enviar foto"');
         scheduleRender();
       };
       const results=document.createElement('div'); results.style.cssText='display:flex;gap:6px;flex-wrap:wrap;margin-top:6px';
@@ -551,7 +551,7 @@ function renderHighlights(){
             results.appendChild(b);
           });
         }catch(e){ results.innerHTML='<span class="hint" style="margin:0">Erro no banco de imagens: '+e.message+'</span>'; }
-        bk.disabled=false; bk.textContent='Buscar foto';
+        bk.disabled=false; bk.textContent='Pesquisar na internet';
       };
       inp.onkeydown=e=>{ if(e.key==='Enter') bk.click(); };
       ctrl.appendChild(bk);
