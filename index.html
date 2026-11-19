@@ -90,6 +90,8 @@
   <section class="step">
     <h2><b>2</b> Escolha os jogos</h2>
     <input type="text" id="search" placeholder="Buscar time ou campeonato">
+    <button class="pri" id="autoGenerate" style="width:100%;margin-top:8px">⚡ GERAR BANNERS AUTOMATICAMENTE</button>
+    <div class="hint" id="autoStatus">Busca os jogos do dia e identifica os destaques sem escolher jogador manualmente.</div>
     <div class="games" id="gameList"></div>
     <div class="hint" id="selCount">0 jogos selecionados</div>
   </section>
@@ -283,26 +285,37 @@ async function setPlayerFromBank(team, res){
   team.player.name=res.name; team.player.source='banco'; team.player.photoUrl=res.img;
   team.player.img=await loadImg(res.img,true); team.player.blocked=!team.player.img;
 }
+function normalizeName(value){
+  return (value||'').toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/[^a-z0-9 ]/g,' ').replace(/\\s+/g,' ').trim();
+}
 async function tryBank(team, names){
+  // Só aceita resultado com nome do atleta e equipe compatíveis; nunca usa "primeiro resultado".
   for(const n of names){
     try{
+      const wanted=normalizeName(n);
       const res=await tsdbSearch(n);
-      const best=res.find(r=>r.cutout && r.team && team.name && r.team.toLowerCase().includes(team.name.toLowerCase().split(' ')[0])) || res.find(r=>r.cutout);
+      const best=res.find(r=>{
+        const found=normalizeName(r.name), club=normalizeName(r.team), target=normalizeName(team.name);
+        return found===wanted && club && target && (club===target || club.includes(target) || target.includes(club));
+      });
       if(best){ await setPlayerFromBank(team,best); return true; }
-    }catch(e){ console.warn(e); }
+    }catch(e){ console.warn('Falha no banco auxiliar de imagens:',e); }
   }
   return false;
 }
 
 async function setPlayerFromApi(team, p){
-  // 1º tenta a foto recortada do banco de imagens; se não achar, usa a foto da API-Football
-  const full=[p.firstname&&p.lastname?`${p.firstname.split(' ')[0]} ${p.lastname.split(' ').slice(-1)[0]}`:null, p.name].filter(Boolean);
-  if(await tryBank(team, full)){ team.player.name=p.name; return; }
-  team.player.name = p.name;
+  // Prioriza a foto vinculada ao atleta na API-Football.
+  team.player.name = p.name || [p.firstname,p.lastname].filter(Boolean).join(' ');
   team.player.source = 'api';
-  team.player.photoUrl = p.photo;
+  team.player.photoUrl = p.photo || '';
   team.player.img = await loadImg(p.photo, true);
   team.player.blocked = !team.player.img;
+  // Só recorre ao banco auxiliar quando nome e clube coincidirem exatamente.
+  if(!team.player.img){
+    const full=[p.name, p.firstname&&p.lastname?`${p.firstname} ${p.lastname}`:null].filter(Boolean);
+    if(await tryBank(team, full)){ team.player.name=p.name || team.player.name; return; }
+  }
 }
 async function autoHighlight(game){
   if(!state.apiKey || !game.leagueId) return;
@@ -323,6 +336,78 @@ async function autoHighlight(game){
       if(pick) await setPlayerFromApi(team, pick);
     }catch(e){ console.warn(e); }
   }
+  renderHighlights(); scheduleRender();
+}
+
+// ===================== GERAÇÃO AUTOMÁTICA =====================
+async function generateAutomatically(){
+  const status=document.getElementById('autoStatus');
+  const sourceMsg=document.getElementById('srcMsg');
+  const btn=document.getElementById('autoGenerate');
+  if(!state.apiKey){
+    msg(sourceMsg,'Para buscar jogos reais e atletas automaticamente, informe sua chave da API-Football.','err');
+    status.textContent='A chave é necessária para consultar jogos e elencos reais.';
+    document.getElementById('apiBox').style.display='block';
+    document.querySelector('#srcSeg [data-src="api"]').click();
+    return;
+  }
+  if(!state.games.length){
+    await loadFixtures();
+    if(!state.games.length) return;
+  }
+  const games=[...state.games];
+  if(!games.length){ status.textContent='Nenhum jogo encontrado para esta data.'; return; }
+  state.selected=new Set(games.map(g=>g.id));
+  renderGameList();
+  renderHighlights();
+  scheduleRender();
+  btn.disabled=true;
+  btn.textContent='GERANDO…';
+  let done=0, total=games.length*2;
+  status.textContent=`Jogos selecionados. Buscando destaques e fotos: 0/${total}`;
+  try{
+    for(const game of games){
+      for(const side of ['home','away']){
+        try{ await autoHighlightSide(game,side); }
+        catch(err){ console.warn('Não foi possível identificar o destaque:',game[side].name,err); }
+        done++;
+        status.textContent=`Identificando atletas e fotos: ${done}/${total} · ${game.home.name} x ${game.away.name}`;
+        renderHighlights();
+        scheduleRender();
+      }
+    }
+    status.textContent=`Concluído! ${games.length} jogos selecionados. Os banners estão prontos para baixar.`;
+    msg(sourceMsg,`Geração automática concluída: ${games.length} jogos.`,'ok');
+  }finally{
+    btn.disabled=false;
+    btn.textContent='⚡ GERAR BANNERS AUTOMATICAMENTE';
+  }
+}
+async function autoHighlightSide(game,side){
+  if(!state.apiKey || !game.leagueId) return;
+  const team=game[side];
+  if(team.player.source==='api' && team.player.name) return;
+  let pick=null;
+  try{
+    const ts=await scorers(game.leagueId,game.season);
+    const hit=ts.find(x=>x.statistics && x.statistics.some(s=>s.team && s.team.id===team.id));
+    if(hit) pick={name:hit.player.name,photo:hit.player.photo,firstname:hit.player.firstname,lastname:hit.player.lastname};
+  }catch(e){ console.warn('Artilheiros indisponíveis:',e); }
+  if(!pick){
+    try{
+      const sq=await squad(team.id);
+      const players=(sq.find(x=>x.team && x.team.id===team.id)?.players)||sq[0]?.players||[];
+      const preferred=players.filter(p=>p.position==='Attacker'||p.position==='Midfielder');
+      const candidate=preferred.find(p=>p.photo)||players.find(p=>p.photo);
+      if(candidate) pick={name:candidate.name,photo:candidate.photo};
+    }catch(e){ console.warn('Elenco indisponível:',e); }
+  }
+  if(pick) await setPlayerFromApi(team,pick);
+  else { team.player.name=''; team.player.img=null; team.player.source=''; }
+}
+async function autoHighlight(game){
+  if(!state.apiKey || !game.leagueId) return;
+  for(const side of ['home','away']) await autoHighlightSide(game,side);
   renderHighlights(); scheduleRender();
 }
 
@@ -777,6 +862,7 @@ keyInp.oninput=()=>{ state.apiKey=keyInp.value.trim(); store('key',state.apiKey)
 const dateInp=document.getElementById('dateInp'); dateInp.value=state.date;
 dateInp.onchange=()=>{ if(/^\d{4}-\d{2}-\d{2}$/.test(dateInp.value)) state.date=dateInp.value; };
 document.getElementById('loadBtn').onclick=loadFixtures;
+document.getElementById('autoGenerate').onclick=generateAutomatically;
 document.getElementById('search').oninput=e=>{ state.filter=e.target.value; renderGameList(); };
 
 const bind=(id,key)=>{ const el=document.getElementById(id); el.oninput=()=>{ state.brand[key]=el.value; saveBrand(); scheduleRender(); }; };
