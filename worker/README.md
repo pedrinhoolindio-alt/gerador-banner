@@ -36,8 +36,9 @@ Resposta:
 - Prompt montado no servidor; não aceita prompt livre do navegador.
 - FLUX Schnell limitado a 4 steps por chamada.
 - O limite gratuito de Workers AI é compartilhado pela conta: 10.000 Neurons/dia. Ao exceder, novas inferências falham no plano Free.
-- CORS não é autenticação e não impede chamadas fora do navegador. Antes de disponibilizar publicamente, configure uma regra de rate limiting no Cloudflare para este hostname/endpoint. Não habilite Workers Paid nem adicione cartão para este projeto.
-- Não há contador próprio persistente neste primeiro corte; não trate CORS como proteção contra abuso.
+- O Worker exige o binding `FLUX_RATE_LIMIT`; sem ele, a geração falha de forma fechada (HTTP 503), evitando inferências sem o limitador ativo.
+- O limite configurado é de 5 gerações por 60 segundos por IP e por localização Cloudflare. É aproximado/distribuído, não é um teto diário rígido nem uma proteção contra todo abuso.
+- `wrangler.jsonc` declara os bindings `AI` e `FLUX_RATE_LIMIT`. Para aplicar a configuração, publique o Worker com Wrangler usando esse arquivo ou crie o binding Rate Limiting equivalente no painel Cloudflare. Não habilite Workers Paid nem adicione cartão para este projeto.
 
 ## Modelo e preço
 
@@ -46,3 +47,8 @@ https://developers.cloudflare.com/workers-ai/models/flux-1-schnell/
 
 Preço/consumo:
 https://developers.cloudflare.com/workers-ai/platform/pricing/
+
+
+## Publicação com Wrangler
+
+O arquivo `wrangler.jsonc` declara o binding Workers AI (`AI`) e o limitador (`FLUX_RATE_LIMIT`). Ao publicar com Wrangler, confirme que a conta permanece no plano Free e que os bindings aparecem no ambiente de produção. Se continuar usando o editor do painel, adicione o binding Rate Limiting com nome `FLUX_RATE_LIMIT`, namespace `7811192026`, limite `5` e período `60` segundos antes de implantar o novo código.
