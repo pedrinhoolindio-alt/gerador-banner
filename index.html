@@ -123,8 +123,9 @@
       <button data-tpl="arena" class="on">Arena (escuro)</button>
       <button data-tpl="claro">Claro</button>
       <button data-tpl="confronto">Confronto</button>
+      <button data-tpl="poster">Pôster</button>
     </div>
-    <div class="hint" id="tplHint">Confronto: 1 jogo por banner, jogadores grandes lado a lado. Fica melhor com fotos recortadas (PNG sem fundo).</div>
+    <div class="hint" id="tplHint">Pôster: arte editorial de jogo, com tipografia gigante, dois atletas em destaque, cores dos clubes e informações da partida.</div>
     <label>Título (modelos Arena e Claro)</label>
     <input type="text" id="title" value="JOGOS DE HOJE">
     <label>Cores</label>
@@ -718,6 +719,7 @@ function drawFooter(c,F,W,H,th){
 
 function drawBanner(cv, games, page, pages){
   if(state.template==='confronto') return drawConfronto(cv, games[0]);
+  if(state.template==='poster') return drawPoster(cv, games[0]);
   const F=FORMATS[state.format], W=F.w, H=F.h, th=theme();
   cv.width=W; cv.height=H;
   const c=cv.getContext('2d');
@@ -840,6 +842,77 @@ function drawConfronto(cv,g){
   c.textAlign='left';
 }
 
+// ===================== MODELO PÔSTER EDITORIAL =====================
+function drawPoster(cv,g){
+  const F=FORMATS[state.format], W=F.w, H=F.h, b=state.brand;
+  cv.width=W; cv.height=H; const c=cv.getContext('2d');
+  const home=g.home, away=g.away, ch=home.color||b.primary, ca=away.color||b.accent;
+  const scale=H/1920, X=n=>n*scale, Y=n=>n*scale;
+  // Fundo dividido pelas identidades dos clubes, com textura e luzes
+  const bg=c.createLinearGradient(0,0,W,H);
+  bg.addColorStop(0,'#07152f'); bg.addColorStop(.48,'#101321'); bg.addColorStop(1,'#070a16');
+  c.fillStyle=bg; c.fillRect(0,0,W,H);
+  let glow=c.createRadialGradient(W*.22,H*.28,10,W*.22,H*.28,W*.72);
+  glow.addColorStop(0,hexA(ch,.72)); glow.addColorStop(1,'rgba(0,0,0,0)');
+  c.fillStyle=glow;c.fillRect(0,0,W,H);
+  glow=c.createRadialGradient(W*.82,H*.22,10,W*.82,H*.22,W*.7);
+  glow.addColorStop(0,hexA(ca,.7));glow.addColorStop(1,'rgba(0,0,0,0)');
+  c.fillStyle=glow;c.fillRect(0,0,W,H);
+  // Grafismos diagonais e formas de energia
+  c.save(); c.globalAlpha=.22; c.lineWidth=X(16);
+  for(let i=-2;i<7;i++){c.strokeStyle=i%2?ch:ca;c.beginPath();c.moveTo(i*X(260),0);c.lineTo(i*X(260)+W*.55,H);c.stroke();}
+  c.restore();
+  // Tipografia monumental atrás dos atletas
+  c.save(); c.globalAlpha=.18; c.textAlign='center'; c.font=`900 ${Math.round(X(410))}px Anton`;
+  c.fillStyle='#fff'; c.fillText((home.name||'CLUBE').toUpperCase().slice(0,13),W*.5,H*.39);
+  c.restore();
+  // Atleta principal em grande escala (lado direito)
+  if(home.player.img){
+    c.save(); c.globalAlpha=.82;
+    const x=W*.23,y=Y(210),w=W*.77,h=Y(1110);
+    c.beginPath();c.rect(x,y,w,h);c.clip();
+    coverBox(c,home.player.img,x,y,w,h);
+    c.restore();
+    const shadeG=c.createLinearGradient(0,Y(650),0,Y(1350));
+    shadeG.addColorStop(0,'rgba(5,8,18,0)');shadeG.addColorStop(1,'rgba(5,8,18,.94)');
+    c.fillStyle=shadeG;c.fillRect(0,Y(650),W,Y(720));
+  }
+  // Segundo atleta em primeiro plano, com moldura luminosa
+  if(away.player.img){
+    c.save();
+    const x=-W*.06,y=Y(650),w=W*.63,h=Y(900);
+    c.shadowColor=hexA(ca,.8);c.shadowBlur=X(42);
+    c.beginPath();c.roundRect(x,y,w,h,X(20));c.clip();
+    coverBox(c,away.player.img,x,y,w,h);
+    c.restore();
+    c.fillStyle=hexA(ca,.8);c.fillRect(0,Y(650),X(9),Y(900));
+  }
+  // Vinheta inferior para garantir leitura
+  const v=c.createLinearGradient(0,H*.58,0,H);
+  v.addColorStop(0,'rgba(3,6,16,0)');v.addColorStop(.32,'rgba(3,6,16,.72)');v.addColorStop(1,'rgba(3,6,16,.98)');
+  c.fillStyle=v;c.fillRect(0,H*.58,W,H*.42);
+  // Identificação da competição
+  c.textAlign='center';c.fillStyle='rgba(255,255,255,.9)';
+  c.font=`800 ${Math.round(X(30))}px Montserrat`;
+  c.fillText((g.compShort||g.comp||'FUTEBOL').toUpperCase(),W/2,Y(105));
+  // Confronto e horário
+  c.textAlign='left';c.fillStyle='#fff';c.font=`400 ${Math.round(X(118))}px Anton`;
+  c.fillText(home.name.toUpperCase(),X(55),H-Y(430));
+  c.fillStyle=b.accent;c.font=`400 ${Math.round(X(76))}px Anton`;
+  c.fillText('X',X(58),H-Y(345));
+  c.fillStyle='#fff';c.font=`400 ${Math.round(X(118))}px Anton`;
+  c.fillText(away.name.toUpperCase(),X(55),H-Y(245));
+  c.fillStyle='rgba(255,255,255,.86)';c.font=`800 ${Math.round(X(29))}px Montserrat`;
+  c.fillText(shortDate(state.date,g.time),X(58),H-Y(155));
+  // Nome dos atletas, se houver
+  c.textAlign='right';c.font=`800 ${Math.round(X(23))}px Montserrat`;c.fillStyle='#fff';
+  if(home.player.name)c.fillText(home.player.name.toUpperCase(),W-X(48),H-Y(82));
+  // Assinatura e faixa de cor
+  c.fillStyle=ch;c.fillRect(0,H-Y(18),W*.52,Y(18));
+  c.fillStyle=ca;c.fillRect(W*.52,H-Y(18),W*.48,Y(18));
+  if(b.handle){c.textAlign='right';c.font=`700 ${Math.round(X(22))}px Montserrat`;c.fillStyle='rgba(255,255,255,.75)';c.fillText(b.handle,W-X(48),Y(155));}
+}
+ 
 // ===================== PREVIEW / DOWNLOAD =====================
 let rt=null;
 function scheduleRender(){ clearTimeout(rt); rt=setTimeout(renderPages,80); }
