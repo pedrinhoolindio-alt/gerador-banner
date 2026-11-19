@@ -9,7 +9,7 @@
   "ratelimits": [
     {
       "name": "FLUX_RATE_LIMIT",
-      "namespace_id": "7811192026",
+      "namespace_id": "78111920261119",
       "simple": {
         "limit": 5,
         "period": 60
