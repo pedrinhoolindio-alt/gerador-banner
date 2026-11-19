@@ -114,7 +114,8 @@ export default {
       ? body.sport : "football";
 
     // Prompt is composed server-side: the browser cannot request arbitrary model behavior.
-    const seed = Number.isInteger(body.seed) && body.seed >= 0 && body.seed <= 2147483647 ? body.seed : Math.floor(Math.random() * 2147483647);\n    const prompt = makePrompt(scene, sport, seed);
+    const seed = Number.isInteger(body.seed) && body.seed >= 0 && body.seed <= 2147483647 ? body.seed : Math.floor(Math.random() * 2147483647);
+    const prompt = makePrompt(scene, sport, seed);
     if (prompt.length > MAX_PROMPT_LENGTH) {
       return json({ error: "Prompt too long." }, 400, origin);
     }
