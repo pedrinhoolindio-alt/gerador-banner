@@ -3,8 +3,8 @@ const ALLOWED_ORIGINS = new Set([
   "https://pedrinhoolindio-alt.github.io",
 ]);
 
-const MAX_PROMPT_LENGTH = 1400;
-const MAX_STEPS = 4;
+const MAX_PROMPT_LENGTH = 2048;
+const MAX_STEPS = 8;
 
 function corsHeaders(origin) {
   return {
@@ -129,7 +129,6 @@ export default {
       return json({
         image: `data:image/jpeg;base64,${result.image}`,
         model: MODEL,
-        scene,
         seed,
         steps: MAX_STEPS,
       }, 200, origin);
