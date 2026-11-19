@@ -286,7 +286,7 @@ async function setPlayerFromBank(team, res){
   team.player.img=await loadImg(res.img,true); team.player.blocked=!team.player.img;
 }
 function normalizeName(value){
-  return (value||'').toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/[^a-z0-9 ]/g,' ').replace(/\\s+/g,' ').trim();
+  return (value||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
 }
 async function tryBank(team, names){
   // Só aceita resultado com nome do atleta e equipe compatíveis; nunca usa "primeiro resultado".
