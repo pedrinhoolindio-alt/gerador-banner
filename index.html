@@ -126,7 +126,14 @@
       <button data-tpl="poster">Pôster</button>
     </div>
     <div class="hint" id="tplHint">Pôster: arte editorial de jogo, com tipografia gigante, dois atletas em destaque, cores dos clubes e informações da partida.</div>
-    <label>Fundo cinematográfico com IA (FLUX)</label>\n    <input type="text" id="aiWorkerUrl" placeholder="URL do Worker Cloudflare (https://...workers.dev)">\n    <div class="row" style="margin-top:8px">\n      <select id="aiScene" style="flex:1"><option value="stadium">Estádio noturno</option><option value="tunnel">Túnel dos jogadores</option><option value="arena">Arena esportiva</option><option value="abstract">Energia abstrata</option></select>\n      <button class="pri" id="aiGenerate">Gerar fundo IA</button>\n    </div>\n    <div class="hint" id="aiStatus">Gera apenas o cenário; atletas e textos continuam sendo montados pelo gerador.</div>\n    <label>Título (modelos Arena e Claro)</label>
+    <label>Fundo cinematográfico com IA (FLUX)</label>
+    <input type="text" id="aiWorkerUrl" placeholder="URL do Worker Cloudflare (https://...workers.dev)">
+    <div class="row" style="margin-top:8px">
+      <select id="aiScene" style="flex:1"><option value="stadium">Estádio noturno</option><option value="tunnel">Túnel dos jogadores</option><option value="arena">Arena esportiva</option><option value="abstract">Energia abstrata</option></select>
+      <button class="pri" id="aiGenerate">Gerar fundo IA</button>
+    </div>
+    <div class="hint" id="aiStatus">Gera apenas o cenário; atletas e textos continuam sendo montados pelo gerador.</div>
+    <label>Título (modelos Arena e Claro)</label>
     <input type="text" id="title" value="JOGOS DE HOJE">
     <label>Cores</label>
     <div class="row">
@@ -851,7 +858,8 @@ function drawPoster(cv,g){
   // Fundo dividido pelas identidades dos clubes, com textura e luzes
   const bg=c.createLinearGradient(0,0,W,H);
   bg.addColorStop(0,'#07152f'); bg.addColorStop(.48,'#101321'); bg.addColorStop(1,'#070a16');
-  c.fillStyle=bg; c.fillRect(0,0,W,H);\n  if(state.aiBackground){ try{ coverBox(c,state.aiBackground,0,0,W,H); }catch(e){ console.warn('Fundo IA indisponível:',e); } }
+  c.fillStyle=bg; c.fillRect(0,0,W,H);
+  if(state.aiBackground){ try{ coverBox(c,state.aiBackground,0,0,W,H); }catch(e){ console.warn('Fundo IA indisponível:',e); } }
   let glow=c.createRadialGradient(W*.22,H*.28,10,W*.22,H*.28,W*.72);
   glow.addColorStop(0,hexA(ch,.72)); glow.addColorStop(1,'rgba(0,0,0,0)');
   c.fillStyle=glow;c.fillRect(0,0,W,H);
@@ -1007,7 +1015,8 @@ document.getElementById('aiGenerate').onclick=async()=>{
   }catch(e){ status.textContent='Não foi possível gerar: '+e.message; }
   finally{ btn.disabled=false; btn.textContent='Gerar fundo IA'; }
 };
-\ndocument.getElementById('dlAll').onclick=()=>{
+
+document.getElementById('dlAll').onclick=()=>{
   document.querySelectorAll('#pages canvas').forEach((cv,i)=>setTimeout(()=>download(cv,i),i*400));
 };
 
