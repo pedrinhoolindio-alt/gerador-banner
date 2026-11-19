@@ -52,3 +52,15 @@ https://developers.cloudflare.com/workers-ai/platform/pricing/
 ## Publicação com Wrangler
 
 O arquivo `wrangler.jsonc` declara o binding Workers AI (`AI`) e o limitador (`FLUX_RATE_LIMIT`). Ao publicar com Wrangler, confirme que a conta permanece no plano Free e que os bindings aparecem no ambiente de produção. Se continuar usando o editor do painel, adicione o binding Rate Limiting com nome `FLUX_RATE_LIMIT`, namespace `7811192026`, limite `5` e período `60` segundos antes de implantar o novo código.
+
+
+## Deploy pelo navegador (GitHub Actions)
+
+Foi adicionado o workflow manual `.github/workflows/deploy-flux-worker.yml`. Para utilizá-lo sem instalar Wrangler no computador:
+
+1. No Cloudflare, copie o **Account ID** da conta.
+2. Crie um API Token na Cloudflare com permissão de edição de Workers Scripts para essa conta. Não compartilhe o token no chat.
+3. No GitHub, abra Settings > Secrets and variables > Actions e crie os secrets `CLOUDFLARE_ACCOUNT_ID` e `CLOUDFLARE_API_TOKEN`.
+4. Abra Actions > Deploy FLUX Worker > Run workflow.
+
+O workflow publica o Worker usando `wrangler.jsonc`, que declara o binding Workers AI `AI` e o rate limiter `FLUX_RATE_LIMIT` (5 chamadas por 60 segundos). O rate limiter é aproximado e por localização Cloudflare, não um limite diário rígido. A geração permanece operacional sem o binding, mas sem rate limiting, até o deploy com essa configuração.
